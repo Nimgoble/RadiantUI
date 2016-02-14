@@ -150,6 +150,11 @@ public:
 
 #if WITH_EDITOR
 	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
+	/**
+	* This alternate version of PostEditChange is called when properties inside structs are modified.  The property that was actually modified
+	* is located at the tail of the list.  The head of the list of the UStructProperty member variable that contains the property that was modified.
+	*/
+	virtual void PostEditChangeChainProperty(struct FPropertyChangedChainEvent& PropertyChangedEvent) override;
 #endif
 
 private:
@@ -201,6 +206,7 @@ private:
 	void SyncMouseState(bool InClearButtons, bool InFocus);
 	bool TraceScreenPoint(APawn* InPawn, FVector2D& OutUV);
 	void OnExecuteJSHook(const FString& HookName, ICefRuntimeVariantList* Arguments);
+	void OnBoundPropertyChanged(const FString& PropertyName, ICefRuntimeVariant* NewValue);
 
 	int32 ModifierKeyState;
 	int32 ModifierKeyExState;

@@ -130,6 +130,12 @@ public:
 		Component->ExecuteJSHook(InHookName, InArguments);
 	}
 
+	virtual void BoundPropertyChanged(const char* PropertyName, ICefRuntimeVariant *NewValue) override
+	{
+		check(Component);
+		Component->BoundPropertyChanged(PropertyName, NewValue);
+	}
+
 	virtual ICefStream* GetFileStream(const char* FilePath) override
 	{
 		check(Component);
@@ -523,6 +529,7 @@ void FRadiantWebView::FlushRenderUpdates()
 void FRadiantWebView::Tick(float InRealTime, float InWorldTime, float InWorldDeltaTime, ERHIFeatureLevel::Type FeatureLevel)
 {
 	ProcessPendingCallbacks();
+	ProcessPendingPropertyChanges();
 
 	if (!bDedicatedServer)
 	{
@@ -648,10 +655,39 @@ void FRadiantWebView::ProcessPendingCallbacks()
 	}
 }
 
+void FRadiantWebView::ProcessPendingPropertyChanges()
+{
+	const int MaxCallbacksPerFrame = 8;
+	FQueuedPropertyChange Stack[MaxCallbacksPerFrame];
+	int NumCallbacks = 0;
+	{
+		FScopeLock L(&CriticalSection);
+		for (auto It = PendingPropertyChanges.CreateConstIterator(); It && (NumCallbacks < MaxCallbacksPerFrame); ++It)
+		{
+			const FQueuedPropertyChange& Callback = *It;
+			Stack[NumCallbacks++] = *It;
+		}
+
+		PendingPropertyChanges.Empty(PendingPropertyChanges.Max());
+	}
+
+	for (int i = 0; i < NumCallbacks; ++i)
+	{
+		const FQueuedPropertyChange& PropertyChange = Stack[i];
+		OnBoundPropertyChanged.Broadcast(PropertyChange.PropertyName, PropertyChange.NewValue);
+	}
+}
+
 void FRadiantWebView::ExecuteJSHook(const char* InHookName, ICefRuntimeVariantList* InArguments)
 {
 	FScopeLock L(&CriticalSection);
 	PendingCallbacks.Add(FQueuedCallback(FString(InHookName), InArguments));
+}
+
+void FRadiantWebView::BoundPropertyChanged(const char* PropertyName, ICefRuntimeVariant *NewValue)
+{
+	FScopeLock L(&CriticalSection);
+	PendingPropertyChanges.Add(FQueuedPropertyChange(FString(PropertyName), NewValue));
 }
 
 void FRadiantWebView::WebViewCreated(ICefWebView* InWebView)

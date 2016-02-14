@@ -191,6 +191,7 @@ void ARadiantWebViewActor::StartRefresh()
 		InitDynamicMaterial();
 
 		WebViewRenderComponent->WebView->OnExecuteJSHook.AddUObject(this, &ARadiantWebViewActor::OnExecuteJSHook);
+		WebViewRenderComponent->WebView->OnBoundPropertyChanged.AddUObject(this, &ARadiantWebViewActor::OnBoundPropertyChanged);
 	}
 }
 
@@ -647,6 +648,140 @@ void ARadiantWebViewActor::OnExecuteJSHook(const FString& HookName, ICefRuntimeV
 	FJavaScriptHelper::ExecuteHook(this, HookName, Arguments);
 }
 
+void ARadiantWebViewActor::OnBoundPropertyChanged(const FString& PropertyName, ICefRuntimeVariant* NewValue)
+{
+	bool TypeMismatch = false;
+	UClass *ourClass = this->GetClass();
+	UProperty *targetProperty = FindField<UProperty>(ourClass, *PropertyName);
+
+	if (NewValue->IsInt())
+	{
+		ICefRuntimeVariantInt* VarInt = static_cast<ICefRuntimeVariantInt*>(NewValue);
+
+		if (targetProperty->IsA<UByteProperty>())
+		{
+			Cast<UByteProperty>(targetProperty)->SetPropertyValue_InContainer(this, (uint8)VarInt->GetValue());
+		}
+		else if (targetProperty->IsA<UIntProperty>())
+		{
+			Cast<UIntProperty>(targetProperty)->SetPropertyValue_InContainer(this, VarInt->GetValue());
+		}
+		else if (targetProperty->IsA<UUInt32Property>())
+		{
+			Cast<UUInt32Property>(targetProperty)->SetPropertyValue_InContainer(this, (int32)VarInt->GetValue());
+		}
+		else
+		{
+			TypeMismatch = true;
+		}
+
+	}
+	else if (NewValue->IsDouble())
+	{
+		ICefRuntimeVariantDouble* VarDouble = static_cast<ICefRuntimeVariantDouble*>(NewValue);
+
+		if (targetProperty->IsA<UFloatProperty>())
+		{
+			Cast<UFloatProperty>(targetProperty)->SetPropertyValue_InContainer(this, (float)VarDouble->GetValue());
+		}
+		else if (targetProperty->IsA<UDoubleProperty>())
+		{
+			Cast<UDoubleProperty>(targetProperty)->SetPropertyValue_InContainer(this, VarDouble->GetValue());
+		}
+		else
+		{
+			TypeMismatch = true;
+		}
+	}
+	else if (NewValue->IsBool())
+	{
+		ICefRuntimeVariantBool* VarBool = static_cast<ICefRuntimeVariantBool*>(NewValue);
+		Cast<UBoolProperty>(targetProperty)->SetPropertyValue_InContainer(this, VarBool->GetValue());
+	}
+	else if (NewValue->IsString())
+	{
+		ICefRuntimeVariantString* VarString = static_cast<ICefRuntimeVariantString*>(NewValue);
+		if (targetProperty->IsA<UStrProperty>())
+		{
+			FString String(VarString->GetValue());
+			Cast<UStrProperty>(targetProperty)->SetPropertyValue_InContainer(this, String);
+		}
+		else if (targetProperty->IsA<UNameProperty>())
+		{
+			FString String(VarString->GetValue());
+			Cast<UNameProperty>(targetProperty)->SetPropertyValue_InContainer(this, *String);
+		}
+		else if (targetProperty->IsA<UTextProperty>())
+		{
+			FString String(VarString->GetValue());
+			Cast<UTextProperty>(targetProperty)->SetPropertyValue_InContainer(this, FText::FromString(String));
+		}
+	}
+	/*else if (NewValue->IsList())
+	{
+		ICefRuntimeVariantList* VarList = static_cast<ICefRuntimeVariantList*>(Variant);
+
+		if (UStructProperty* StructProperty = Cast<UStructProperty>(targetProperty))
+		{
+			UScriptStruct* InnerStruct = StructProperty->Struct;
+
+			void* StructContainer = StructProperty->ContainerPtrToValuePtr<void*>(Container);
+
+			int StructIndex = 0;
+			for (TFieldIterator<UProperty> It(InnerStruct); It; ++It, ++StructIndex)
+			{
+				if (StructIndex >= VarList->GetSize())
+				{
+					UE_LOG(RadiantUILog, Error, TEXT("JavaScript Hook Function '%s' caller did not supply enough arguments for field '%s'."), *HookName, ArgumentIndex, *(*It)->GetPathName());
+					return false;
+				}
+
+				if (!StoreFunctionParameter(HookName, StructContainer, *It, VarList->GetValue(StructIndex), ArgumentIndex))
+				{
+					return false;
+				}
+			}
+		}*/
+		/*else if (UArrayProperty* ArrayProperty = Cast<UArrayProperty>(Argument))
+		{
+			FScriptArrayHelper ScriptArray(ArrayProperty, ArrayProperty->ContainerPtrToValuePtr<void*>(Container));
+			check(ScriptArray.Num() == 0);
+
+			if (VarList->GetSize() > 0)
+			{
+				const int ListSize = VarList->GetSize();
+				ScriptArray.Resize(ListSize);
+
+				ICefRuntimeVariant* VarHead = VarList->GetValue(0);
+
+				for (int i = 0; i < ListSize; ++i)
+				{
+					ICefRuntimeVariant* Var = VarList->GetValue(i);
+					if (Var->GetType() != VarHead->GetType())
+					{
+						UE_LOG(RadiantUILog, Error, TEXT("JavaScript Hook Function '%s' argument %d field '%s' subscript '%d' is an array element, but the provided parameter list contains heterogeneous element types. Array element initializers must all have the same type."), *HookName, ArgumentIndex, *Argument->GetPathName(), i);
+						return false;
+					}
+
+					if (!StoreFunctionParameter(HookName, ScriptArray.GetRawPtr(i), ArrayProperty->Inner, Var, ArgumentIndex))
+					{
+						return false;
+					}
+				}
+			}
+		}*/
+		/*else
+		{
+			TypeMismatch = true;
+		}
+	}*/
+
+	if (TypeMismatch)
+	{
+		UE_LOG(RadiantUILog, Error, TEXT("Bound Property '%s' argument %d type mismatch"), *PropertyName, (int)NewValue->GetType());
+	}
+}
+
 void ARadiantWebViewActor::GetLifetimeReplicatedProps(TArray< FLifetimeProperty > & OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -665,5 +800,11 @@ void ARadiantWebViewActor::PostEditChangeProperty(struct FPropertyChangedEvent& 
 	}*/
 
 	Super::PostEditChangeProperty(PropertyChangedEvent);
+}
+
+void ARadiantWebViewActor::PostEditChangeChainProperty(struct FPropertyChangedChainEvent& PropertyChangedEvent)
+{
+	int breakHere = 0;
+	Super::PostEditChangeChainProperty(PropertyChangedEvent);
 }
 #endif

@@ -102,6 +102,10 @@ public:
 	// Invoked from JavaScript to Run Game Function
 	FOnExecuteJSHook OnExecuteJSHook;
 
+	DECLARE_EVENT_TwoParams(FRadiantWebView, FOnBoundPropertyChanged, const FString&, ICefRuntimeVariant*);
+	// Invoked from JavaScript to Run Game Function
+	FOnBoundPropertyChanged OnBoundPropertyChanged;
+
 	// Only valid if Start() or PreCreateTexture() have been called.
 	UTexture2D* WebViewTexture;
 	URadiantCanvasRenderTarget* WebViewCanvas;
@@ -199,7 +203,57 @@ private:
 		ICefRuntimeVariantList* Arguments;
 	};
 
+	struct FQueuedPropertyChange
+	{
+		FQueuedPropertyChange() : NewValue(nullptr) {}
+
+		FQueuedPropertyChange(const FQueuedPropertyChange& Other) : NewValue(nullptr)
+		{
+			*this = Other;
+		}
+
+		FQueuedPropertyChange(const FString& InPropertyName, ICefRuntimeVariant* InNewValue)
+			: PropertyName(InPropertyName), NewValue(InNewValue)
+		{
+			if (NewValue)
+			{
+				NewValue->AddRef();
+			}
+		}
+
+		~FQueuedPropertyChange()
+		{
+			if (NewValue)
+			{
+				NewValue->Release();
+			}
+		}
+
+		FQueuedPropertyChange& operator = (const FQueuedPropertyChange& Other)
+		{
+			PropertyName = Other.PropertyName;
+
+			if (NewValue)
+			{
+				NewValue->Release();
+			}
+
+			NewValue = Other.NewValue;
+
+			if (NewValue)
+			{
+				NewValue->AddRef();
+			}
+
+			return *this;
+		}
+
+		FString PropertyName;
+		ICefRuntimeVariant* NewValue;
+	};
+
 	TArray<FQueuedCallback> PendingCallbacks;
+	TArray<FQueuedPropertyChange> PendingPropertyChanges;
 	FRadiantWebViewCursor* MouseCursor;
 	ICefWebView* volatile WebView;
 
@@ -252,7 +306,9 @@ private:
 	void BlitWebViewToRenderTarget();
 	void BlitCursor();
 	void ProcessPendingCallbacks();
+	void ProcessPendingPropertyChanges();
 	void ExecuteJSHook(const char* InHookName, ICefRuntimeVariantList* InArguments);
+	void BoundPropertyChanged(const char* PropertyName, ICefRuntimeVariant *NewValue);
 
 	// Begin ICefWebViewCallbacks Interface
 	void WebViewCreated(ICefWebView* InWebView);

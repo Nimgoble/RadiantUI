@@ -6,6 +6,7 @@
 #include <map>
 
 #define RADUIIPCMSG_FOCUSNODECHANGED "RADUIIPC.EditModeChanged"
+#define RADUIIPCMSG_PROPERTYCHANGED "RADUIIPC.NotifyPropertyChanged"
 
 class CefFrameworkApp : public CefApp, public CefBrowserProcessHandler, public CefRenderProcessHandler
 {

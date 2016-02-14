@@ -76,6 +76,42 @@ public:
 				Handled = true;
 			}
 		}
+		else if (InName == "NotifyPropertyChanged")
+		{
+			int argumentsCount = InArguments.size();
+			CefString PropertyName = InArguments[0]->GetStringValue();
+
+			CefRefPtr<CefBrowser> Browser = CefV8Context::GetCurrentContext()->GetBrowser();
+			ASSERT(Browser.get());
+
+			//CefString PropertyName = ArgumentArray->GetValue(0)->GetStringValue();
+			if (!PropertyName.empty())
+			{
+				CefRefPtr<CefProcessMessage> Message = CefProcessMessage::Create(RADUIIPCMSG_PROPERTYCHANGED);
+
+				// translate remaining args.
+				if ((argumentsCount > 1)/* && ArgumentArray->GetValue(1)->IsArray()*/)
+				{
+					//CefRefPtr<CefV8Value> InParameter = InArguments[0];
+					////const int NumParameters = InParameters->GetArrayLength();
+					//const int NumParameters = 1;
+
+					CefRefPtr<CefListValue> OutParameters = Message->GetArgumentList();
+					OutParameters->SetSize(2);
+
+					V8ValueToListItem_RenderThread(InArguments[0], OutParameters, 0);//PropertyName
+					V8ValueToListItem_RenderThread(InArguments[1], OutParameters, 1);//NewValue
+
+					/*for (int i = 0; i < (int)NumParameters; ++i)
+					{
+						V8ValueToListItem_RenderThread(InParameters->GetValue(i), OutParameters, i);
+					}*/
+				}
+
+				Browser->SendProcessMessage(PID_BROWSER, Message);
+				Handled = true;
+			}
+		}
 		else
 		{
 			ValidAPI = false;
@@ -129,6 +165,10 @@ void CefFrameworkApp::OnWebKitInitialized()
 		"  RadiantUI.TriggerEvent = function() {"
 		"    native function TriggerEvent();"
 		"    return TriggerEvent(Array.prototype.slice.call(arguments));"
+		"  };"
+		"  RadiantUI.NotifyPropertyChanged = function(propertyName, newValue) {"
+		"    native function NotifyPropertyChanged();"
+		"    return NotifyPropertyChanged(propertyName, newValue);"
 		"  };"
 		"  RadiantUI.SetCallback = function(name, callback) {"
 		"    native function SetHook();"

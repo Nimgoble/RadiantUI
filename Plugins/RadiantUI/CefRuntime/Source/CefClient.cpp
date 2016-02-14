@@ -112,11 +112,17 @@ void CefFrameworkClient::LoadURL(const CefString& InURL)
 bool CefFrameworkClient::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefProcessId source_process, CefRefPtr<CefProcessMessage> message)
 {
 	ASSERT(source_process == PID_RENDERER);
-
-	if (message->GetName() == RADUIIPCMSG_FOCUSNODECHANGED)
+	CefString messageName = message->GetName();
+	if (messageName == RADUIIPCMSG_FOCUSNODECHANGED)
 	{
 		InEditableField = message->GetArgumentList()->GetBool(0);
 		Callbacks->FocusedNodeChanged(InEditableField);
+	}
+	else if (messageName == RADUIIPCMSG_PROPERTYCHANGED)
+	{
+		ICefRuntimeVariantList* Arguments = CefListToVariant(message->GetArgumentList());
+		Callbacks->BoundPropertyChanged(message->GetArgumentList()->GetString(0).ToString().c_str(), Arguments->GetValue(1));
+		Arguments->Release();
 	}
 	else
 	{

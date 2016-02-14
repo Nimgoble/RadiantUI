@@ -343,6 +343,8 @@ public:
 	// Called by JavaScript to execute a hook function in the game
 	virtual void ExecuteJSHook(const char* InHookName, ICefRuntimeVariantList* InArguments) = 0;
 
+	virtual void BoundPropertyChanged(const char* PropertyName, ICefRuntimeVariant* NewValue) = 0;
+
 	virtual ICefStream* GetFileStream(const char* FilePath) = 0;
 
 	// Allows the CEF API to make protected calls into game code in an order
